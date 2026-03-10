@@ -35,6 +35,8 @@
   let useTranslationCache = false;
   let coverImageUri = '';
   let useCover = true;
+  let useCoverImage = true;          // 표지 이미지 사용 여부 (false → 단색)
+  let coverSolidColor = '#1a1a1a';   // 이미지 미사용 시 단색 색상
   let templateMode = 'full'; // 'full' | 'no-cover' | 'text-only'
   let coverZoom = 100;
   let coverFocusX = 50;
@@ -834,17 +836,27 @@
     const font = "font-family:'Noto Serif KR','Noto Serif JP','Noto Serif SC','Noto Serif TC',Georgia,'Times New Roman',serif";
     const pName = personaName || personaDisplayName;
     const displayPName = (useUserTag && pName) ? '{{user}}' : pName;
-    const effectiveCoverUri = (useCover && coverImageUri) ? coverImageUri : ((useCover && charImageUri) ? charImageUri : '');
+    const effectiveCoverUri = coverImageUri ? coverImageUri : charImageUri;
 
     let h = '<div style="box-shadow:0 4px 16px rgba(0,0,0,0.1);max-width:900px;margin:5px auto;border-radius:1rem;background-color:' + theme.bg + ';padding:0 0 clamp(20px,4vw,30px) 0;' + font + ';font-size:clamp(13px,2.3vw,14.2px);" data-chatlog="true">';
 
-    // -- 커버 섹션 --
-    if (templateMode !== 'text-only') {
-    h += '<div style="margin:0 0 30px 0;box-sizing:border-box;border-radius:16px 16px 0 0;background-color:' + theme.coverBg + ';">';
-    if (effectiveCoverUri && templateMode === 'full') {
-      h += '<div style="background-color:#1a1a1a;background-image:url(\'' + effectiveCoverUri.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\');background-size:' + coverZoom + '%;background-position:' + coverFocusX + '% ' + coverFocusY + '%;background-repeat:no-repeat;border-radius:16px 16px 0 0;display:table;">';
-      h += '<div style="display:table-cell;vertical-align:bottom;height:min(68vw,615px);min-height:200px;padding:clamp(15px,3vw,20px) clamp(30px,5vw,40px);box-sizing:border-box;background:' + theme.coverGrad + ';border-radius:16px 16px 0 0;">';
+    // -- 커버 섹션 (Form A 전용) --
+    if (templateMode === 'full') {
+    const hasCoverImage = useCoverImage && effectiveCoverUri;
+    const bgColor = !useCoverImage ? coverSolidColor : theme.coverBg;
+    h += '<div style="margin:0 0 30px 0;border-radius:16px 16px 0 0;overflow:hidden;">';
+    if (hasCoverImage) {
+      // 이미지 표지 — 2레이어 구조 (이미지 + 콘텐츠 분리)
+      const safeUri = effectiveCoverUri.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      const zoomScale = coverZoom / 100;
+      const zoomCss = zoomScale > 1 ? 'transform:scale(' + zoomScale.toFixed(2) + ');transform-origin:' + coverFocusX + '% ' + coverFocusY + '%;' : '';
+      h += '<div style="position:relative;min-height:min(68vw,615px);border-radius:16px 16px 0 0;overflow:hidden;">';
+      h += '<div style="position:absolute;inset:0;background-image:url(\'' + safeUri + '\');background-size:cover;background-position:' + coverFocusX + '% ' + coverFocusY + '%;' + zoomCss + '"></div>';
+      h += '<div style="position:absolute;inset:0;background:' + theme.coverGrad + ';"></div>';
+      h += '<div style="position:relative;min-height:min(68vw,615px);display:flex;flex-direction:column;justify-content:flex-end;padding:clamp(15px,3vw,20px) clamp(30px,5vw,40px);box-sizing:border-box;">';
     } else {
+      // 단색 표지 — 축소된 높이
+      h += '<div style="background-color:' + bgColor + ';border-radius:16px 16px 0 0;">';
       h += '<div style="padding:clamp(20px,4vw,30px) clamp(30px,5vw,40px) clamp(15px,3vw,20px) clamp(30px,5vw,40px);">';
     }
     h += '<div style="font-size:clamp(10px,1.8vw,11px);color:' + theme.coverLabel + ';letter-spacing:clamp(2px,0.4vw,3px);margin:0 0 5px 0;' + font + ';">' + escHtml(coverLabel) + '</div>';
@@ -861,12 +873,12 @@
       for (const tag of allTags) h += '<span style="' + tgS + '">' + escHtml(tag) + '</span> ';
       h += '</div>';
     }
-    if (effectiveCoverUri && templateMode === 'full') h += '</div></div>';
-    else h += '</div>';
+    if (hasCoverImage) h += '</div></div>';
+    else h += '</div></div>';
     h += '</div>';
     } // end cover section
 
-    // -- 프로필 섹션 --
+    // -- 프로필 섹션 (Form A, Form B) --
     if (templateMode !== 'text-only') {
     h += '<div style="padding:0 0 10px 0;">';
     h += '<div style="padding:0 clamp(30px,5vw,50px) 10px clamp(30px,5vw,50px);text-align:center;">';
@@ -1145,7 +1157,6 @@
             <button class="sel-btn" id="btn-sel-all">전체</button>
             <button class="sel-btn" id="btn-sel-none">해제</button>
             <button class="sel-btn" id="btn-sel-nouser" title="선택 범위에서 유저 메시지만 해제">유저 해제</button>
-            <span id="range-hint"></span>
           </div>
           <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
             <span class="range-label">앞</span>
@@ -1194,35 +1205,47 @@
         </div>
 
         <div class="se-group">
-          <label class="se-label">🖼️ 표지 이미지</label>
+          <label class="se-label">🖼️ 템플릿 형태</label>
           <div class="se-row" style="margin-bottom:6px;">
-            <span style="font-size:12px;color:#8b949e;">템플릿:</span>
             <select class="se-input" id="template-mode" style="flex:1;">
-              <option value="full">표지 + 프로필 + 본문</option>
-              <option value="no-cover">프로필 + 본문</option>
-              <option value="text-only">본문만</option>
+              <option value="full">Form A — 표지 + 프로필 + 본문</option>
+              <option value="no-cover">Form B — 프로필 + 본문</option>
+              <option value="text-only">Form C — 본문만</option>
             </select>
           </div>
-          <div class="se-row">
-            <label class="btn" style="flex:1;text-align:center;cursor:pointer;">📷 업로드<input type="file" id="cover-upload" accept="image/*" style="display:none;"></label>
-            <button class="btn btn-danger" id="btn-cover-remove" style="display:none;font-size:11px;">🗑️</button>
-          </div>
-          <img id="cover-preview" class="cover-preview" style="display:none;">
-          <div id="cover-controls" style="display:none;margin-top:6px;">
-            <div class="se-row" style="margin-bottom:4px;">
-              <span style="font-size:11px;color:#8b949e;width:50px;">Zoom</span>
-              <input type="range" id="cover-zoom" min="100" max="300" value="100" style="flex:1;accent-color:#58a6ff;">
-              <span id="cover-zoom-val" style="font-size:11px;color:#8b949e;width:30px;text-align:right;">100%</span>
-            </div>
-            <div class="se-row" style="margin-bottom:4px;">
-              <span style="font-size:11px;color:#8b949e;width:50px;">Focus X</span>
-              <input type="range" id="cover-focus-x" min="0" max="100" value="50" style="flex:1;accent-color:#58a6ff;">
-              <span id="cover-fx-val" style="font-size:11px;color:#8b949e;width:30px;text-align:right;">50%</span>
-            </div>
+        </div>
+
+        <div class="se-group" id="cover-settings-group">
+          <label class="se-label">🖼️ 표지 이미지</label>
+          <label class="se-check" style="margin-bottom:6px;"><input type="checkbox" id="chk-cover-image" checked> 표지 이미지 사용</label>
+          <div id="cover-image-settings">
             <div class="se-row">
-              <span style="font-size:11px;color:#8b949e;width:50px;">Focus Y</span>
-              <input type="range" id="cover-focus-y" min="0" max="100" value="50" style="flex:1;accent-color:#58a6ff;">
-              <span id="cover-fy-val" style="font-size:11px;color:#8b949e;width:30px;text-align:right;">50%</span>
+              <label class="btn" style="flex:1;text-align:center;cursor:pointer;">📷 업로드<input type="file" id="cover-upload" accept="image/*" style="display:none;"></label>
+              <button class="btn btn-danger" id="btn-cover-remove" style="display:none;font-size:11px;">🗑️</button>
+            </div>
+            <img id="cover-preview" class="cover-preview" style="display:none;">
+            <div id="cover-controls" style="display:none;margin-top:6px;">
+              <div class="se-row" style="margin-bottom:4px;">
+                <span style="font-size:11px;color:#8b949e;width:50px;">Zoom</span>
+                <input type="range" id="cover-zoom" min="100" max="300" value="100" style="flex:1;accent-color:#58a6ff;">
+                <span id="cover-zoom-val" style="font-size:11px;color:#8b949e;width:30px;text-align:right;">100%</span>
+              </div>
+              <div class="se-row" style="margin-bottom:4px;">
+                <span style="font-size:11px;color:#8b949e;width:50px;">Focus X</span>
+                <input type="range" id="cover-focus-x" min="0" max="100" value="50" style="flex:1;accent-color:#58a6ff;">
+                <span id="cover-fx-val" style="font-size:11px;color:#8b949e;width:30px;text-align:right;">50%</span>
+              </div>
+              <div class="se-row">
+                <span style="font-size:11px;color:#8b949e;width:50px;">Focus Y</span>
+                <input type="range" id="cover-focus-y" min="0" max="100" value="50" style="flex:1;accent-color:#58a6ff;">
+                <span id="cover-fy-val" style="font-size:11px;color:#8b949e;width:30px;text-align:right;">50%</span>
+              </div>
+            </div>
+          </div>
+          <div id="cover-solid-settings" style="display:none;margin-top:6px;">
+            <div class="se-row">
+              <span style="font-size:12px;color:#8b949e;">단색 배경:</span>
+              <input type="color" id="cover-solid-color" value="#1a1a1a" style="width:36px;height:28px;border:1px solid #30363d;border-radius:4px;cursor:pointer;background:transparent;">
             </div>
           </div>
         </div>
@@ -1317,12 +1340,18 @@
     $('btn-copy-html').addEventListener('click', async () => {
       const btn = $('btn-copy-html');
       try {
-        let html = buildStyledHtml();
+        let html = await buildMobileHtml();
+        if (!html) html = buildStyledHtml();
         if (!html) return;
         html = html.replace(/<details open>/g, '<details>').replace(/<details open="">/g, '<details>').replace(/ data-chatlog="true"/g, '');
-        await copyHtmlToClipboard(html, btn, '\u{1F4CB} HTML \uBCF5\uC0AC');
+        copyMobileHtml(html, btn, '\u{1F4CB} HTML \uBCF5\uC0AC');
       } catch (e) {
-        console.error('ChatLogDiary: HTML copy failed:', e);
+        try {
+          const html = buildStyledHtml().replace(/<details open>/g, '<details>').replace(/ data-chatlog="true"/g, '');
+          copyMobileHtml(html, btn, '\u{1F4CB} HTML \uBCF5\uC0AC');
+        } catch (e2) {
+          console.error('ChatLogDiary: HTML copy failed:', e2);
+        }
       }
     });
     $('btn-copy-text').addEventListener('click', () => {
@@ -1345,10 +1374,28 @@
       if (viewMode === 'preview') renderPreview();
     });
     $('chk-usertag').addEventListener('change', (e) => { useUserTag = e.target.checked; });
+    const updateCoverSettingsVisibility = () => {
+      const showCover = templateMode === 'full';
+      $('cover-settings-group').style.display = showCover ? '' : 'none';
+    };
     $('template-mode').addEventListener('change', (e) => {
       templateMode = e.target.value;
-      useCover = templateMode === 'full';
       includeHeaderImages = templateMode !== 'text-only';
+      updateCoverSettingsVisibility();
+      if (viewMode === 'preview') renderPreview();
+    });
+    const updateCoverImageToggle = () => {
+      $('cover-image-settings').style.display = useCoverImage ? '' : 'none';
+      $('cover-solid-settings').style.display = useCoverImage ? 'none' : '';
+    };
+    $('chk-cover-image').addEventListener('change', (e) => {
+      useCoverImage = e.target.checked;
+      updateCoverImageToggle();
+      if (viewMode === 'preview') renderPreview();
+    });
+    $('cover-solid-color').addEventListener('input', (e) => {
+      coverSolidColor = e.target.value;
+      if (viewMode === 'preview') renderPreview();
     });
     $('input-splitsize').addEventListener('change', (e) => { pageSplitSize = parseInt(e.target.value, 10) || 0; });
     const FS_LABELS = ['\uAE30\uBCF8', '13px', '14px', '15px', '16px', '18px'];
