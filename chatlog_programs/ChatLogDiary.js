@@ -933,6 +933,44 @@
     return header + indices.map(i => { const m = allMessages[i]; return applyReplacements(applyPersona(m.name)) + ':\n' + applyReplacements(applyPersona(m.text)); }).join('\n\n');
   };
 
+  // ========== 모바일 HTML 빌드 (삼성 클립보드 호환) ==========
+  const buildMobileHtml = async () => {
+    const origAssetMap = assetMap;
+    const origCharImg = charImageUri;
+    const origPersonaImg = personaImageUri;
+    const origCoverImg = coverImageUri;
+    const mobileMap = {};
+    let hasDataUriFallback = false;
+    for (const name of Object.keys(origAssetMap)) {
+      if (assetUrlMap[name]) {
+        mobileMap[name] = assetUrlMap[name];
+      } else {
+        mobileMap[name] = origAssetMap[name];
+        if (origAssetMap[name] && origAssetMap[name].startsWith('data:')) hasDataUriFallback = true;
+      }
+    }
+    assetMap = mobileMap;
+    charImageUri = charImageUrl || origCharImg;
+    personaImageUri = personaImageUrl || origPersonaImg;
+    if (!charImageUrl && origCharImg && origCharImg.startsWith('data:')) hasDataUriFallback = true;
+    if (!personaImageUrl && origPersonaImg && origPersonaImg.startsWith('data:')) hasDataUriFallback = true;
+    // Cover image: if it's a user-uploaded data URI, compress it
+    if (coverImageUri && coverImageUri.startsWith('data:')) hasDataUriFallback = true;
+    let html;
+    try {
+      html = buildStyledHtml();
+    } finally {
+      assetMap = origAssetMap;
+      charImageUri = origCharImg;
+      personaImageUri = origPersonaImg;
+      coverImageUri = origCoverImg;
+    }
+    if (hasDataUriFallback) {
+      html = await compressDataUrisInHtml(html, 800, 0.7);
+    }
+    return html;
+  };
+
   // ========== UI 구축 ==========
   const setupUI = () => {
     const style = document.createElement('style');
@@ -1002,6 +1040,27 @@
 
       /* 범위 힌트 */
       #range-hint { font-size:11px; color:#484f58; margin-top:4px; }
+
+      /* UI Light Mode */
+      .ui-light #log-overlay { background:#f6f8fa; }
+      .ui-light .top-bar { background:#ffffff; border-bottom-color:#d0d7de; }
+      .ui-light .top-bar .title { color:#1f2328; }
+      .ui-light .top-bar .info { color:#656d76; }
+      .ui-light .tab-bar { background:#ffffff; border-bottom-color:#d0d7de; }
+      .ui-light .tab-bar .tab { color:#656d76; }
+      .ui-light .tab-bar .tab.active { background:#ddf4ff; color:#0969da; }
+      .ui-light .btn { background:#f6f8fa; border-color:#d0d7de; color:#1f2328; }
+      .ui-light .btn-primary { background:#2da44e; border-color:#2da44e; color:#fff; }
+      .ui-light .btn-close { color:#656d76; }
+      .ui-light .msg-block { border-bottom-color:#d0d7de; }
+      .ui-light .msg-block .msg-text { color:#656d76; }
+      .ui-light .msg-block .msg-idx { color:#8c959f; }
+      .ui-light .bottom-bar { background:#ffffff; border-top-color:#d0d7de; }
+      .ui-light .settings-drawer { background:#ffffff; border-left-color:#d0d7de; }
+      .ui-light .se-label { color:#656d76; }
+      .ui-light .se-input, .ui-light .se-input-sm { background:#f6f8fa; border-color:#d0d7de; color:#1f2328; }
+      .ui-light .se-check { color:#1f2328; }
+      .ui-light #range-hint { color:#8c959f; }
     `;
     document.head.appendChild(style);
 
@@ -1013,6 +1072,7 @@
           <span class="title">📖 Chat Log Diary</span>
           <span class="info" id="log-info"></span>
           <span class="spacer"></span>
+          <button class="btn" id="btn-ui-mode" style="font-size:12px;">🌞</button>
           <button class="btn" id="btn-settings">⚙️</button>
           <button class="btn-close" id="btn-close">✕</button>
         </div>
@@ -1057,11 +1117,30 @@
             <button class="btn" id="btn-sel-none" style="font-size:11px;padding:3px 8px;">해제</button>
             <button class="btn" id="btn-sel-nouser" style="font-size:11px;padding:3px 8px;">유저 제외</button>
           </div>
+          <div class="se-row" style="gap:4px;">
+            <span style="font-size:11px;color:#8b949e;">앞</span>
+            <input type="number" class="se-input-sm" id="front-n" min="1" value="10" style="width:45px;">
+            <button class="btn" id="btn-sel-front" style="font-size:11px;padding:3px 8px;">선택</button>
+            <span style="font-size:11px;color:#8b949e;margin-left:4px;">뒤</span>
+            <input type="number" class="se-input-sm" id="back-n" min="1" value="10" style="width:45px;">
+            <button class="btn" id="btn-sel-back" style="font-size:11px;padding:3px 8px;">선택</button>
+          </div>
         </div>
 
         <div class="se-group">
           <label class="se-label">📝 로그 제목</label>
           <input type="text" class="se-input" id="input-title" placeholder="선택사항">
+        </div>
+
+        <div class="se-group">
+          <label class="se-label">📌 표지 상단 문구</label>
+          <input type="text" class="se-input" id="input-cover-label" placeholder="CHAT LOG" value="CHAT LOG">
+        </div>
+
+        <div class="se-group">
+          <label class="se-label">📄 본문 제목</label>
+          <input type="text" class="se-input" id="input-page-title" placeholder="Page Title (기본: 본문)" style="margin-bottom:4px;">
+          <input type="text" class="se-input" id="input-page-subtitle" placeholder="Page Subtitle (기본: N개 메시지)">
         </div>
 
         <div class="se-group">
@@ -1079,8 +1158,21 @@
         </div>
 
         <div class="se-group">
+          <label class="se-label">🏷️ 태그</label>
+          <div id="tag-list"></div>
+          <button class="btn" id="btn-add-tag" style="font-size:11px;margin-top:4px;">+ 태그 추가</button>
+        </div>
+
+        <div class="se-group">
           <label class="se-label">🖼️ 표지 이미지</label>
-          <label class="se-check" style="margin-bottom:6px;"><input type="checkbox" id="chk-cover" checked> 표지 사용</label>
+          <div class="se-row" style="margin-bottom:6px;">
+            <span style="font-size:12px;color:#8b949e;">템플릿:</span>
+            <select class="se-input" id="template-mode" style="flex:1;">
+              <option value="full">표지 + 프로필 + 본문</option>
+              <option value="no-cover">프로필 + 본문</option>
+              <option value="text-only">본문만</option>
+            </select>
+          </div>
           <div class="se-row">
             <label class="btn" style="flex:1;text-align:center;cursor:pointer;">📷 업로드<input type="file" id="cover-upload" accept="image/*" style="display:none;"></label>
             <button class="btn btn-danger" id="btn-cover-remove" style="display:none;font-size:11px;">🗑️</button>
@@ -1108,10 +1200,21 @@
         <div class="se-group">
           <label class="se-label">⚙️ 옵션</label>
           <label class="se-check"><input type="checkbox" id="chk-images" checked> 본문 이미지 포함</label>
-          <label class="se-check"><input type="checkbox" id="chk-header-images" checked> 프로필 이미지 표시</label>
           <label class="se-check"><input type="checkbox" id="chk-translation"> 번역문 사용</label>
-          <label class="se-check"><input type="checkbox" id="chk-hide-charname"> 캐릭터 이름 숨기기</label>
-          <label class="se-check"><input type="checkbox" id="chk-hide-username"> 유저 이름 숨기기</label>
+        </div>
+
+        <div class="se-group">
+          <label class="se-label">🔤 본문 글자 크기 / 줄 간격</label>
+          <div class="se-row">
+            <span style="font-size:11px;color:#8b949e;width:50px;">크기</span>
+            <input type="range" id="body-fontsize" min="0" max="5" value="0" style="flex:1;accent-color:#58a6ff;">
+            <span id="body-fs-val" style="font-size:11px;color:#8b949e;width:40px;text-align:right;">기본</span>
+          </div>
+          <div class="se-row">
+            <span style="font-size:11px;color:#8b949e;width:50px;">간격</span>
+            <input type="range" id="body-lineheight" min="0" max="5" value="0" style="flex:1;accent-color:#58a6ff;">
+            <span id="body-lh-val" style="font-size:11px;color:#8b949e;width:40px;text-align:right;">기본</span>
+          </div>
         </div>
 
         <div class="se-group">
@@ -1182,16 +1285,22 @@
     }
 
     $('btn-copy-html').addEventListener('click', async () => {
-      let html = buildStyledHtml();
-      if (!html) return;
-      // Remove data-chatlog attribute for clean output
-      html = html.replaceAll(' data-chatlog="true"', '');
       try {
+        let html = await buildMobileHtml();
+        if (!html) return;
+        html = html.replaceAll(' data-chatlog="true"', '');
         await copyMobileHtml(html, $('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC');
       } catch (err) {
         console.error('ChatLogDiary: HTML copy failed:', err);
-        // Ultimate fallback: copy as plain text
-        try { await navigator.clipboard.writeText(html); showCopied($('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC'); } catch (e2) {}
+        try {
+          let html = buildStyledHtml();
+          if (html) {
+            html = html.replaceAll(' data-chatlog="true"', '');
+            copyMobileHtml(html, $('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC');
+          }
+        } catch (e2) {
+          try { await navigator.clipboard.writeText(buildStyledHtml()); showCopied($('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC'); } catch (e3) {}
+        }
       }
     });
     $('btn-copy-text').addEventListener('click', () => {
