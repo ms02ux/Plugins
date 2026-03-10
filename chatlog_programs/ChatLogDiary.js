@@ -279,6 +279,13 @@
     }
   };
 
+  // ========== 테마 조회 (THEMES + customThemes 병합) ==========
+  const getTheme = (key) => {
+    if (THEMES[key]) return THEMES[key];
+    if (customThemes[key]) return customThemes[key];
+    return THEMES['navy'];
+  };
+
   // ========== 에셋 유틸 ==========
   const RISU_ASSET_BASE = 'https://sv.risuai.xyz/rs/assets/';
   const getAssetRisuUrl = (key) => {
@@ -1041,6 +1048,16 @@
       /* 범위 힌트 */
       #range-hint { font-size:11px; color:#484f58; margin-top:4px; }
 
+      /* 범위·선택 컨트롤 (LogPlus 스타일) */
+      .range-group { display:flex; align-items:center; gap:5px; }
+      .range-label { color:#8b949e; font-size:11px; font-weight:500; white-space:nowrap; }
+      .range-input { width:58px; padding:4px 6px; background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:5px; font-size:12px; text-align:center; outline:none; }
+      .range-input:focus { border-color:#58a6ff; }
+      .range-apply-btn { padding:4px 10px; background:#21262d; color:#8b949e; border:1px solid #30363d; border-radius:5px; cursor:pointer; font-size:11px; font-weight:500; transition:all 0.2s; }
+      .range-apply-btn:hover { background:#30363d; color:#c9d1d9; }
+      .sel-btn { padding:3px 8px; background:#21262d; color:#8b949e; border:1px solid #30363d; border-radius:5px; cursor:pointer; font-size:11px; transition:all 0.15s; }
+      .sel-btn:hover { background:#30363d; color:#c9d1d9; }
+
       /* UI Light Mode */
       .ui-light #log-overlay { background:#f6f8fa; }
       .ui-light .top-bar { background:#ffffff; border-bottom-color:#d0d7de; }
@@ -1061,6 +1078,13 @@
       .ui-light .se-input, .ui-light .se-input-sm { background:#f6f8fa; border-color:#d0d7de; color:#1f2328; }
       .ui-light .se-check { color:#1f2328; }
       .ui-light #range-hint { color:#8c959f; }
+      .ui-light .range-input { background:#f6f8fa; border-color:#d0d7de; color:#1f2328; }
+      .ui-light .range-input:focus { border-color:#0969da; }
+      .ui-light .range-label { color:#656d76; }
+      .ui-light .range-apply-btn { background:#f6f8fa; border-color:#d0d7de; color:#656d76; }
+      .ui-light .range-apply-btn:hover { background:#e8eaed; color:#1f2328; }
+      .ui-light .sel-btn { background:#f6f8fa; border-color:#d0d7de; color:#656d76; }
+      .ui-light .sel-btn:hover { background:#e8eaed; color:#1f2328; }
     `;
     document.head.appendChild(style);
 
@@ -1105,25 +1129,31 @@
         </div>
 
         <div class="se-group">
-          <label class="se-label">📐 메시지 범위</label>
-          <div class="se-row">
-            <input type="number" class="se-input-sm" id="range-start" min="1" value="1">
-            <span style="color:#484f58;">~</span>
-            <input type="number" class="se-input-sm" id="range-end" min="1" value="1">
-            <button class="btn" id="btn-apply-range" style="font-size:11px;padding:4px 8px;">적용</button>
+          <label class="se-label">📐 범위 · 선택</label>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+            <div class="range-group">
+              <span class="range-label">시작</span>
+              <input type="number" class="range-input" id="range-start" min="1" value="1">
+            </div>
+            <div class="range-group">
+              <span class="range-label">끝</span>
+              <input type="number" class="range-input" id="range-end" min="1" value="1">
+            </div>
+            <button class="range-apply-btn" id="btn-apply-range">범위 선택</button>
           </div>
-          <div class="se-row" style="gap:4px;">
-            <button class="btn" id="btn-sel-all" style="font-size:11px;padding:3px 8px;">전체</button>
-            <button class="btn" id="btn-sel-none" style="font-size:11px;padding:3px 8px;">해제</button>
-            <button class="btn" id="btn-sel-nouser" style="font-size:11px;padding:3px 8px;">유저 제외</button>
+          <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:4px;">
+            <button class="sel-btn" id="btn-sel-all">전체</button>
+            <button class="sel-btn" id="btn-sel-none">해제</button>
+            <button class="sel-btn" id="btn-sel-nouser" title="선택 범위에서 유저 메시지만 해제">유저 해제</button>
+            <span id="range-hint"></span>
           </div>
-          <div class="se-row" style="gap:4px;">
-            <span style="font-size:11px;color:#8b949e;">앞</span>
-            <input type="number" class="se-input-sm" id="front-n" min="1" value="10" style="width:45px;">
-            <button class="btn" id="btn-sel-front" style="font-size:11px;padding:3px 8px;">선택</button>
-            <span style="font-size:11px;color:#8b949e;margin-left:4px;">뒤</span>
-            <input type="number" class="se-input-sm" id="back-n" min="1" value="10" style="width:45px;">
-            <button class="btn" id="btn-sel-back" style="font-size:11px;padding:3px 8px;">선택</button>
+          <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+            <span class="range-label">앞</span>
+            <input type="number" class="range-input" id="front-n" min="1" value="10" style="width:48px;">
+            <button class="sel-btn" id="btn-sel-front">선택</button>
+            <span class="range-label" style="margin-left:4px;">뒤</span>
+            <input type="number" class="range-input" id="back-n" min="1" value="10" style="width:48px;">
+            <button class="sel-btn" id="btn-sel-back">선택</button>
           </div>
         </div>
 
@@ -1285,21 +1315,19 @@
     }
 
     $('btn-copy-html').addEventListener('click', async () => {
+      const btn = $('btn-copy-html');
       try {
-        let html = await buildMobileHtml();
+        let html = '';
+        if (!html) html = buildStyledHtml();
         if (!html) return;
-        html = html.replaceAll(' data-chatlog="true"', '');
-        await copyMobileHtml(html, $('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC');
-      } catch (err) {
-        console.error('ChatLogDiary: HTML copy failed:', err);
+        html = html.replace(/<details open>/g, '<details>').replace(/<details open="">/g, '<details>').replace(/ data-chatlog="true"/g, '');
+        await copyHtmlToClipboard(html, btn, '\u{1F4CB} HTML \uBCF5\uC0AC');
+      } catch (e) {
         try {
-          let html = buildStyledHtml();
-          if (html) {
-            html = html.replaceAll(' data-chatlog="true"', '');
-            copyMobileHtml(html, $('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC');
-          }
+          const html = buildStyledHtml().replace(/<details open>/g, '<details>').replace(/ data-chatlog="true"/g, '');
+          await copyHtmlToClipboard(html, btn, '\u{1F4CB} HTML \uBCF5\uC0AC');
         } catch (e2) {
-          try { await navigator.clipboard.writeText(buildStyledHtml()); showCopied($('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC'); } catch (e3) { console.error('ChatLogDiary: All clipboard methods failed:', e3); }
+          console.error('ChatLogDiary: HTML copy failed:', e2);
         }
       }
     });
@@ -1315,7 +1343,13 @@
     $('input-model').addEventListener('input', (e) => { modelInfo = e.target.value; });
     $('input-prompt').addEventListener('input', (e) => { promptInfo = e.target.value; });
     $('chk-images').addEventListener('change', (e) => { includeImages = e.target.checked; });
-    $('chk-translation').addEventListener('change', (e) => { useTranslationCache = e.target.checked; });
+    $('chk-translation').addEventListener('change', async (e) => {
+      useTranslationCache = e.target.checked;
+      const { messages } = await extractChatLog();
+      allMessages = messages;
+      renderMessages();
+      if (viewMode === 'preview') renderPreview();
+    });
     $('chk-usertag').addEventListener('change', (e) => { useUserTag = e.target.checked; });
     $('template-mode').addEventListener('change', (e) => {
       templateMode = e.target.value;
