@@ -1317,18 +1317,12 @@
     $('btn-copy-html').addEventListener('click', async () => {
       const btn = $('btn-copy-html');
       try {
-        let html = '';
-        if (!html) html = buildStyledHtml();
+        let html = buildStyledHtml();
         if (!html) return;
         html = html.replace(/<details open>/g, '<details>').replace(/<details open="">/g, '<details>').replace(/ data-chatlog="true"/g, '');
         await copyHtmlToClipboard(html, btn, '\u{1F4CB} HTML \uBCF5\uC0AC');
       } catch (e) {
-        try {
-          const html = buildStyledHtml().replace(/<details open>/g, '<details>').replace(/ data-chatlog="true"/g, '');
-          await copyHtmlToClipboard(html, btn, '\u{1F4CB} HTML \uBCF5\uC0AC');
-        } catch (e2) {
-          console.error('ChatLogDiary: HTML copy failed:', e2);
-        }
+        console.error('ChatLogDiary: HTML copy failed:', e);
       }
     });
     $('btn-copy-text').addEventListener('click', () => {
