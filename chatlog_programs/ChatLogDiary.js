@@ -1,7 +1,7 @@
 //@name ChatLogDiary
 //@display-name 📖 Chat Log Diary
 //@api 3.0
-//@version 1.0.0
+//@version 2.0.0
 //@description 채팅 로그를 LogDiary 스타일 HTML로 변환하여 클립보드에 복사합니다. 삼성 폰 호환.
 
 (async () => {
@@ -28,15 +28,74 @@
   let personaImageUrl = '';
   let personaDisplayName = '';
   let logTitle = '';
-  let hideCharName = false;
-  let hideUserName = false;
+  let coverLabel = 'CHAT LOG';
+  let customPageTitle = '';
+  let customPageSubtitle = '';
   let loadPersonaList = null;
   let useTranslationCache = false;
   let coverImageUri = '';
   let useCover = true;
+  let templateMode = 'full'; // 'full' | 'no-cover' | 'text-only'
+  let coverZoom = 100;
+  let coverFocusX = 50;
+  let coverFocusY = 50;
   let pageSplitSize = 30;
+  let bodyFontSize = 0;
+  let bodyLineHeight = 0;
   let replacements = [];
+  let customTags = [];
+  let customThemes = {
+    'custom1': {
+      name: '\u{1F3A8} \uCEE4\uC2A4\uD140 1',
+      bg: '#ffffff', text: '#2c3e50', headerText: '#162a3e', tagText: '#6c8da8',
+      dialogue: 'background-color:#f0f2f5;color:#162a3e;font-weight:600;padding:0 4px;border-radius:2px',
+      thought: 'background-color:#f0f2f5;color:#2c3e50;padding:0 4px;border-radius:2px',
+      sound: 'color:#162a3e;font-weight:600;font-style:italic;padding:0 4px',
+      action: 'color:#2d5af0;font-style:italic', narration: 'color:#2c3e50',
+      userInput: 'color:#2d5af0;font-style:italic',
+      charName: 'color:#162a3e;font-weight:700', userName: 'color:#162a3e;font-weight:700',
+      paragraph: 'margin:0 0 10px 0;color:#2c3e50;line-height:1.7;letter-spacing:-0.5px;text-align:left;word-break:keep-all',
+      innerWrap: 'line-height:1.7;letter-spacing:-0.5px',
+      pageBg: '#e8eaed', coverBg: '#1a1a1a',
+      coverGrad: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 25%, transparent 45%)',
+      coverLabel: 'rgba(255,255,255,0.8)', coverTitle: '#ffffff', coverDesc: 'rgba(255,255,255,0.9)',
+      tagBg: 'rgba(255,255,255,0.1)', tagBorder: 'rgba(255,255,255,0.3)', tagColor: '#ffffff',
+      sectionColor: '#162a3e', sectionBorder: '#162a3e',
+      profLabel: '#6c8da8', profName: '#162a3e', profFallback: '#e8eaed',
+      pageNum: '#162a3e', pageTitle: '#162a3e', pageSub: '#6c8da8', chevron: '#6c8da8',
+      divider: 'rgba(22,42,62,0.12)',
+      preview: { bg: '#ffffff', text: '#2c3e50', accent: '#162a3e' },
+      _customBg: '#ffffff', _customHighlight: '#d1fae5', _customBody: '#2c3e50',
+      _customCover: '#ffffff', _customSection: '#162a3e'
+    },
+    'custom2': {
+      name: '\u{1F3A8} \uCEE4\uC2A4\uD140 2',
+      bg: '#0d1117', text: '#c9d1d9', headerText: '#f0f6fc', tagText: '#8b949e',
+      dialogue: 'background-color:#1c2433;color:#c9d1d9;font-weight:600;padding:0 4px;border-radius:2px',
+      thought: 'background-color:#1c2433;color:#8b949e;padding:0 4px;border-radius:2px',
+      sound: 'color:#d2a8ff;font-weight:600;font-style:italic;padding:0 4px',
+      action: 'color:#79c0ff;font-style:italic', narration: 'color:#c9d1d9',
+      userInput: 'color:#79c0ff;font-style:italic',
+      charName: 'color:#79c0ff;font-weight:700', userName: 'color:#58a6ff;font-weight:700',
+      paragraph: 'margin:0 0 10px 0;color:#c9d1d9;line-height:1.7;letter-spacing:-0.5px;text-align:left;word-break:keep-all',
+      innerWrap: 'line-height:1.7;letter-spacing:-0.5px',
+      pageBg: '#010409', coverBg: '#161b22',
+      coverGrad: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 30%, transparent 55%)',
+      coverLabel: 'rgba(255,255,255,0.6)', coverTitle: '#f0f6fc', coverDesc: 'rgba(255,255,255,0.7)',
+      tagBg: 'rgba(255,255,255,0.08)', tagBorder: 'rgba(255,255,255,0.2)', tagColor: '#c9d1d9',
+      sectionColor: '#58a6ff', sectionBorder: '#58a6ff',
+      profLabel: '#58a6ff', profName: '#f0f6fc', profFallback: '#2d333b',
+      pageNum: '#58a6ff', pageTitle: '#f0f6fc', pageSub: '#8b949e', chevron: '#8b949e',
+      divider: '#30363d',
+      preview: { bg: '#0d1117', text: '#c9d1d9', accent: '#58a6ff' },
+      _customBg: '#0d1117', _customHighlight: '#1c2433', _customBody: '#c9d1d9',
+      _customCover: '#f0f6fc', _customSection: '#58a6ff'
+    }
+  };
   const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const FS_OPTIONS = ['', '13px', '14px', '15px', '16px', '18px'];
+  const LH_OPTIONS = ['', '1.5', '1.7', '1.9', '2.0', '2.2'];
+  let uiDarkMode = true;
 
   // ========== 번역 캐시 조회 ==========
   function extractLongestPlainChunk(text) {
@@ -303,6 +362,8 @@
 
   const stripHtml = (html) => {
     if (!html) return '';
+    // Remove <Thoughts>...</Thoughts> content before DOM parsing
+    html = html.replace(/<Thoughts>[\s\S]*?<\/Thoughts>/gi, '');
     const div = document.createElement('div');
     div.innerHTML = html;
     div.querySelectorAll('style, script').forEach(el => el.remove());
@@ -663,13 +724,7 @@
   // ========== 페르소나/단어 치환 ==========
   const getPersonaVariants = (name) => {
     if (!name) return [];
-    const variants = new Set();
-    variants.add(name);
-    const trimmed = name.trim();
-    if (/^[\uAC00-\uD7AF]{2,4}$/.test(trimmed)) { const given = trimmed.slice(1); if (given.length >= 1) variants.add(given); }
-    const parts = trimmed.split(/\s+/);
-    if (parts.length >= 2) { parts.forEach(p => { if (p.length >= 2) variants.add(p); }); if (parts.length >= 3) variants.add(parts[0] + ' ' + parts[1]); }
-    return Array.from(variants).sort((a, b) => b.length - a.length);
+    return [name.trim()];
   };
 
   const applyPersona = (text) => {
@@ -735,8 +790,7 @@
       let displayName = applyReplacements(applyPersona(msg.name));
       let displayText = applyReplacements(applyPersona(msg.text));
       const isUser = msg.role === 'user';
-      const hideName = isUser ? hideUserName : hideCharName;
-      if (!hideName) {
+      {
         const nameStyle = isUser ? theme.userName : theme.charName;
         body += '<p style="' + pStyle() + '"><span style="' + nameStyle + '">' + escHtml(displayName) + ':</span></p>';
       }
@@ -766,7 +820,7 @@
   // ========== 메인 HTML 생성 (LogDiary 스타일) ==========
   const buildStyledHtml = () => {
     if (allMessages.length === 0) return '';
-    const theme = THEMES[currentTheme];
+    const theme = getTheme(currentTheme);
     const indices = [...selectedSet].sort((a, b) => a - b);
     if (indices.length === 0) return '';
     const isDark = currentTheme === 'dark';
@@ -778,28 +832,35 @@
     let h = '<div style="box-shadow:0 4px 16px rgba(0,0,0,0.1);max-width:900px;margin:5px auto;border-radius:1rem;background-color:' + theme.bg + ';padding:0 0 clamp(20px,4vw,30px) 0;' + font + ';font-size:clamp(13px,2.3vw,14.2px);" data-chatlog="true">';
 
     // -- 커버 섹션 --
+    if (templateMode !== 'text-only') {
     h += '<div style="margin:0 0 30px 0;box-sizing:border-box;border-radius:16px 16px 0 0;background-color:' + theme.coverBg + ';">';
-    if (effectiveCoverUri) {
-      h += '<div style="background-color:#1a1a1a;background-image:url(\'' + effectiveCoverUri.replace(/'/g, "\\'") + '\');background-size:cover;background-position:50% 50%;background-repeat:no-repeat;border-radius:16px 16px 0 0;display:table;">';
+    if (effectiveCoverUri && templateMode === 'full') {
+      h += '<div style="background-color:#1a1a1a;background-image:url(\'' + effectiveCoverUri.replace(/'/g, "\\'") + '\');background-size:' + coverZoom + '%;background-position:' + coverFocusX + '% ' + coverFocusY + '%;background-repeat:no-repeat;border-radius:16px 16px 0 0;display:table;">';
       h += '<div style="display:table-cell;vertical-align:bottom;height:min(68vw,615px);min-height:200px;padding:clamp(15px,3vw,20px) clamp(30px,5vw,40px);box-sizing:border-box;background:' + theme.coverGrad + ';border-radius:16px 16px 0 0;">';
     } else {
       h += '<div style="padding:clamp(20px,4vw,30px) clamp(30px,5vw,40px) clamp(15px,3vw,20px) clamp(30px,5vw,40px);">';
     }
-    h += '<div style="font-size:clamp(10px,1.8vw,11px);color:' + theme.coverLabel + ';letter-spacing:clamp(2px,0.4vw,3px);margin:0 0 5px 0;' + font + ';">CHAT LOG</div>';
+    h += '<div style="font-size:clamp(10px,1.8vw,11px);color:' + theme.coverLabel + ';letter-spacing:clamp(2px,0.4vw,3px);margin:0 0 5px 0;' + font + ';">' + escHtml(coverLabel) + '</div>';
     h += '<div style="font-size:clamp(28px,5vw,42px);color:' + theme.coverTitle + ';margin:0;' + font + ';font-weight:700;line-height:1.1;">' + escHtml(charName) + '</div>';
     if (logTitle) h += '<div style="font-size:clamp(12px,2.2vw,14px);letter-spacing:-0.5px;color:' + theme.coverDesc + ';margin:5px 0 10px 0;' + font + ';max-width:90%;">' + escHtml(logTitle) + '</div>';
-    if (modelInfo || promptInfo) {
-      const tgS = 'display:inline-block;background:' + theme.tagBg + ';color:' + theme.tagColor + ';padding:clamp(4px,0.8vw,5px) clamp(10px,2vw,12px);margin:0 clamp(6px,1.2vw,8px) clamp(6px,1.2vw,8px) 0;border:1px solid ' + theme.tagBorder + ';font-size:clamp(10px,1.8vw,11px);' + font;
+    // Gather all tags: model, prompt, custom
+    const allTags = [];
+    if (modelInfo) allTags.push(modelInfo);
+    if (promptInfo) allTags.push(promptInfo);
+    for (const t of customTags) { if (t && t.trim()) allTags.push(t.trim()); }
+    if (allTags.length > 0) {
+      const tgS = 'display:inline-block;background:' + theme.tagBg + ';color:' + theme.tagColor + ';padding:clamp(4px,0.8vw,5px) clamp(10px,2vw,12px);margin:0 clamp(6px,1.2vw,8px) clamp(6px,1.2vw,8px) 0;border:1px solid ' + theme.tagBorder + ';font-size:clamp(10px,1.8vw,11px);line-height:1.4;vertical-align:middle;' + font;
       h += '<div style="font-size:0;">';
-      if (modelInfo) h += '<span style="' + tgS + '">' + escHtml(modelInfo) + '</span> ';
-      if (promptInfo) h += '<span style="' + tgS + '">' + escHtml(promptInfo) + '</span> ';
+      for (const tag of allTags) h += '<span style="' + tgS + '">' + escHtml(tag) + '</span> ';
       h += '</div>';
     }
-    if (effectiveCoverUri) h += '</div></div>';
+    if (effectiveCoverUri && templateMode === 'full') h += '</div></div>';
     else h += '</div>';
     h += '</div>';
+    } // end cover section
 
     // -- 프로필 섹션 --
+    if (templateMode !== 'text-only') {
     h += '<div style="padding:0 0 10px 0;">';
     h += '<div style="padding:0 clamp(30px,5vw,50px) 10px clamp(30px,5vw,50px);text-align:center;">';
     h += '<span style="display:inline-block;font-size:clamp(11px,2vw,13px);font-weight:600;letter-spacing:clamp(1.5px,0.3vw,2px);color:' + theme.sectionColor + ';text-transform:uppercase;border-bottom:1px solid ' + theme.sectionBorder + ';padding-bottom:5px;margin-bottom:10px;">Profile</span>';
@@ -807,7 +868,7 @@
     const profCard = (imgUri, label, name) => {
       let c = '<div style="display:table-cell;vertical-align:top;text-align:center;box-sizing:border-box;padding:0 clamp(10px,3vw,30px);width:50%;">';
       if (imgUri && includeHeaderImages) {
-        c += '<div style="text-align:center;margin:0 auto 12px auto;"><img src="' + imgUri + '" alt="avatar" style="max-width:clamp(80px,22vw,200px);border-radius:50%;"></div>';
+        c += '<div style="text-align:center;margin:0 auto 12px auto;"><img src="' + imgUri + '" alt="avatar" style="width:clamp(80px,22vw,200px);height:clamp(80px,22vw,200px);border-radius:50%;object-fit:cover;"></div>';
       }
       c += '<div style="text-align:center;">';
       c += '<div style="font-size:clamp(8px,1.3vw,10px);color:' + theme.profLabel + ';margin-bottom:3px;font-weight:600;text-transform:uppercase;' + font + ';">' + label + '</div>';
@@ -819,6 +880,7 @@
     h += profCard(charImageUri, 'CHAR', charName);
     if (pName) h += profCard(personaImageUri, 'USER', displayPName);
     h += '</div></div></div>';
+    } // end profile section
 
     // -- 콘텐츠 섹션 (페이지 분할) --
     const splitSize = pageSplitSize > 0 ? pageSplitSize : indices.length;
@@ -842,7 +904,10 @@
       h += '<div style="display:table-cell;vertical-align:middle;width:clamp(50px,10vw,70px);text-align:right;padding-right:clamp(30px,5vw,50px);">';
       h += '<span style="font-size:clamp(16px,3vw,20px);color:' + theme.chevron + ';">\u2335</span>';
       h += '</div></div></div></summary>';
-      h += '<div style="padding:clamp(15px,3vw,20px) clamp(30px,5vw,50px);' + theme.innerWrap + '">';
+      let innerExtra = theme.innerWrap;
+      if (bodyFontSize > 0 && FS_OPTIONS[bodyFontSize]) innerExtra += ';font-size:' + FS_OPTIONS[bodyFontSize];
+      if (bodyLineHeight > 0 && LH_OPTIONS[bodyLineHeight]) innerExtra += ';line-height:' + LH_OPTIONS[bodyLineHeight];
+      h += '<div style="padding:clamp(15px,3vw,20px) clamp(30px,5vw,50px);' + innerExtra + '">';
       h += buildBodyHtml(pageIndices, theme);
       h += '</div></details>';
 
@@ -1021,6 +1086,23 @@
             <button class="btn btn-danger" id="btn-cover-remove" style="display:none;font-size:11px;">🗑️</button>
           </div>
           <img id="cover-preview" class="cover-preview" style="display:none;">
+          <div id="cover-controls" style="display:none;margin-top:6px;">
+            <div class="se-row" style="margin-bottom:4px;">
+              <span style="font-size:11px;color:#8b949e;width:50px;">Zoom</span>
+              <input type="range" id="cover-zoom" min="100" max="300" value="100" style="flex:1;accent-color:#58a6ff;">
+              <span id="cover-zoom-val" style="font-size:11px;color:#8b949e;width:30px;text-align:right;">100%</span>
+            </div>
+            <div class="se-row" style="margin-bottom:4px;">
+              <span style="font-size:11px;color:#8b949e;width:50px;">Focus X</span>
+              <input type="range" id="cover-focus-x" min="0" max="100" value="50" style="flex:1;accent-color:#58a6ff;">
+              <span id="cover-fx-val" style="font-size:11px;color:#8b949e;width:30px;text-align:right;">50%</span>
+            </div>
+            <div class="se-row">
+              <span style="font-size:11px;color:#8b949e;width:50px;">Focus Y</span>
+              <input type="range" id="cover-focus-y" min="0" max="100" value="50" style="flex:1;accent-color:#58a6ff;">
+              <span id="cover-fy-val" style="font-size:11px;color:#8b949e;width:30px;text-align:right;">50%</span>
+            </div>
+          </div>
         </div>
 
         <div class="se-group">
@@ -1056,6 +1138,11 @@
 
     const openDrawer = () => { $('drawer-overlay').classList.add('open'); $('settings-drawer').classList.add('open'); };
     const closeDrawer = () => { $('drawer-overlay').classList.remove('open'); $('settings-drawer').classList.remove('open'); };
+    $('btn-ui-mode').addEventListener('click', () => {
+      uiDarkMode = !uiDarkMode;
+      document.body.classList.toggle('ui-light', !uiDarkMode);
+      $('btn-ui-mode').textContent = uiDarkMode ? '\u{1F31E}' : '\u{1F319}';
+    });
     $('btn-settings').addEventListener('click', openDrawer);
     $('btn-drawer-close').addEventListener('click', closeDrawer);
     $('drawer-overlay').addEventListener('click', closeDrawer);
@@ -1077,8 +1164,9 @@
     });
 
     const themeChips = $('theme-chips');
-    const themeColors = { navy: '#162a3e', dark: '#0d1117', cream: '#faf8f3', rose: '#fdf2f4' };
-    for (const [key, theme] of Object.entries(THEMES)) {
+    const themeColors = { navy: '#162a3e', dark: '#0d1117', cream: '#faf8f3', rose: '#fdf2f4', custom1: '#7c3aed', custom2: '#ec4899' };
+    const allThemeEntries = [...Object.entries(THEMES), ...Object.entries(customThemes)];
+    for (const [key, theme] of allThemeEntries) {
       const chip = document.createElement('span');
       chip.className = 'theme-chip' + (key === currentTheme ? ' active' : '');
       chip.style.background = themeColors[key] || theme.bg;
@@ -1096,8 +1184,15 @@
     $('btn-copy-html').addEventListener('click', async () => {
       let html = buildStyledHtml();
       if (!html) return;
-      html = html.replace('<details open>', '<details>').replace(/ data-chatlog="true"/, '');
-      copyMobileHtml(html, $('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC');
+      // Remove data-chatlog attribute for clean output
+      html = html.replace(/ data-chatlog="true"/, '');
+      try {
+        await copyMobileHtml(html, $('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC');
+      } catch (err) {
+        console.error('ChatLogDiary: HTML copy failed:', err);
+        // Ultimate fallback: copy as plain text
+        try { await navigator.clipboard.writeText(html); showCopied($('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC'); } catch (e2) {}
+      }
     });
     $('btn-copy-text').addEventListener('click', () => {
       const text = buildPlainText();
@@ -1105,16 +1200,24 @@
     });
 
     $('input-title').addEventListener('input', (e) => { logTitle = e.target.value; });
+    $('input-cover-label').addEventListener('input', (e) => { coverLabel = e.target.value || 'CHAT LOG'; });
+    $('input-page-title').addEventListener('input', (e) => { customPageTitle = e.target.value; });
+    $('input-page-subtitle').addEventListener('input', (e) => { customPageSubtitle = e.target.value; });
     $('input-model').addEventListener('input', (e) => { modelInfo = e.target.value; });
     $('input-prompt').addEventListener('input', (e) => { promptInfo = e.target.value; });
     $('chk-images').addEventListener('change', (e) => { includeImages = e.target.checked; });
-    $('chk-header-images').addEventListener('change', (e) => { includeHeaderImages = e.target.checked; });
     $('chk-translation').addEventListener('change', (e) => { useTranslationCache = e.target.checked; });
-    $('chk-hide-charname').addEventListener('change', (e) => { hideCharName = e.target.checked; });
-    $('chk-hide-username').addEventListener('change', (e) => { hideUserName = e.target.checked; });
     $('chk-usertag').addEventListener('change', (e) => { useUserTag = e.target.checked; });
-    $('chk-cover').addEventListener('change', (e) => { useCover = e.target.checked; });
+    $('template-mode').addEventListener('change', (e) => {
+      templateMode = e.target.value;
+      useCover = templateMode === 'full';
+      includeHeaderImages = templateMode !== 'text-only';
+    });
     $('input-splitsize').addEventListener('change', (e) => { pageSplitSize = parseInt(e.target.value, 10) || 0; });
+    const FS_LABELS = ['\uAE30\uBCF8', '13px', '14px', '15px', '16px', '18px'];
+    const LH_LABELS = ['\uAE30\uBCF8', '1.5', '1.7', '1.9', '2.0', '2.2'];
+    $('body-fontsize').addEventListener('input', (e) => { bodyFontSize = parseInt(e.target.value, 10); $('body-fs-val').textContent = FS_LABELS[bodyFontSize] || '\uAE30\uBCF8'; });
+    $('body-lineheight').addEventListener('input', (e) => { bodyLineHeight = parseInt(e.target.value, 10); $('body-lh-val').textContent = LH_LABELS[bodyLineHeight] || '\uAE30\uBCF8'; });
 
     $('cover-upload').addEventListener('change', (e) => {
       const file = e.target.files[0];
@@ -1126,6 +1229,7 @@
         $('cover-preview').src = coverImageUri;
         $('cover-preview').style.display = 'block';
         $('btn-cover-remove').style.display = 'inline-block';
+        $('cover-controls').style.display = 'block';
       };
       reader.readAsDataURL(file);
     });
@@ -1134,8 +1238,12 @@
       $('cover-preview').src = '';
       $('cover-preview').style.display = 'none';
       $('btn-cover-remove').style.display = 'none';
+      $('cover-controls').style.display = 'none';
       $('cover-upload').value = '';
     });
+    $('cover-zoom').addEventListener('input', (e) => { coverZoom = parseInt(e.target.value, 10); $('cover-zoom-val').textContent = coverZoom + '%'; });
+    $('cover-focus-x').addEventListener('input', (e) => { coverFocusX = parseInt(e.target.value, 10); $('cover-fx-val').textContent = coverFocusX + '%'; });
+    $('cover-focus-y').addEventListener('input', (e) => { coverFocusY = parseInt(e.target.value, 10); $('cover-fy-val').textContent = coverFocusY + '%'; });
 
     const loadPersonaListFn = async () => {
       try {
@@ -1174,6 +1282,21 @@
     $('btn-sel-all').addEventListener('click', selectAll);
     $('btn-sel-none').addEventListener('click', selectNone);
     $('btn-sel-nouser').addEventListener('click', deselectUser);
+    $('btn-sel-front').addEventListener('click', () => {
+      const n = parseInt($('front-n').value, 10) || 10;
+      selectedSet.clear();
+      for (let i = 0; i < Math.min(n, allMessages.length); i++) selectedSet.add(i);
+      renderMessages(); updateRangeHint();
+      if (viewMode === 'preview') renderPreview();
+    });
+    $('btn-sel-back').addEventListener('click', () => {
+      const n = parseInt($('back-n').value, 10) || 10;
+      selectedSet.clear();
+      const start = Math.max(0, allMessages.length - n);
+      for (let i = start; i < allMessages.length; i++) selectedSet.add(i);
+      renderMessages(); updateRangeHint();
+      if (viewMode === 'preview') renderPreview();
+    });
 
     const renderRepList = () => {
       const list = $('rep-list');
@@ -1194,6 +1317,23 @@
       });
     };
     $('btn-add-rep').addEventListener('click', () => { replacements.push({ from: '', to: '' }); renderRepList(); });
+
+    const renderTagList = () => {
+      const list = $('tag-list');
+      list.innerHTML = '';
+      customTags.forEach((tag, i) => {
+        const row = document.createElement('div');
+        row.className = 'rep-row';
+        row.innerHTML = '<input class="se-input" placeholder="\uD0DC\uADF8 \uD14D\uC2A4\uD2B8" style="flex:1;font-size:12px;padding:4px 6px;">' +
+          '<button class="rep-remove">\u2715</button>';
+        const input = row.querySelector('input');
+        input.value = tag || '';
+        input.addEventListener('input', (e) => { customTags[i] = e.target.value; });
+        row.querySelector('.rep-remove').addEventListener('click', () => { customTags.splice(i, 1); renderTagList(); });
+        list.appendChild(row);
+      });
+    };
+    $('btn-add-tag').addEventListener('click', () => { customTags.push(''); renderTagList(); });
   };
 
   // ========== 범위 관리 ==========
@@ -1294,7 +1434,7 @@
   const renderPreview = () => {
     let html = buildStyledHtml();
     if (!html) return;
-    const theme = THEMES[currentTheme];
+    const theme = getTheme(currentTheme);
     const pageBg = theme.pageBg || '#1a1a1a';
     const frame = document.getElementById('preview-frame');
     const fullPage = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'
