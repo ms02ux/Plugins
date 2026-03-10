@@ -362,7 +362,7 @@
 
   const stripHtml = (html) => {
     if (!html) return '';
-    // Remove <Thoughts>...</Thoughts> content before DOM parsing
+    // Strip <Thoughts>...</Thoughts> content (AI internal reasoning, not meant for display)
     html = html.replace(/<Thoughts>[\s\S]*?<\/Thoughts>/gi, '');
     const div = document.createElement('div');
     div.innerHTML = html;
@@ -835,7 +835,7 @@
     if (templateMode !== 'text-only') {
     h += '<div style="margin:0 0 30px 0;box-sizing:border-box;border-radius:16px 16px 0 0;background-color:' + theme.coverBg + ';">';
     if (effectiveCoverUri && templateMode === 'full') {
-      h += '<div style="background-color:#1a1a1a;background-image:url(\'' + effectiveCoverUri.replace(/'/g, "\\'") + '\');background-size:' + coverZoom + '%;background-position:' + coverFocusX + '% ' + coverFocusY + '%;background-repeat:no-repeat;border-radius:16px 16px 0 0;display:table;">';
+      h += '<div style="background-color:#1a1a1a;background-image:url(\'' + effectiveCoverUri.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\');background-size:' + coverZoom + '%;background-position:' + coverFocusX + '% ' + coverFocusY + '%;background-repeat:no-repeat;border-radius:16px 16px 0 0;display:table;">';
       h += '<div style="display:table-cell;vertical-align:bottom;height:min(68vw,615px);min-height:200px;padding:clamp(15px,3vw,20px) clamp(30px,5vw,40px);box-sizing:border-box;background:' + theme.coverGrad + ';border-radius:16px 16px 0 0;">';
     } else {
       h += '<div style="padding:clamp(20px,4vw,30px) clamp(30px,5vw,40px) clamp(15px,3vw,20px) clamp(30px,5vw,40px);">';
@@ -1185,7 +1185,7 @@
       let html = buildStyledHtml();
       if (!html) return;
       // Remove data-chatlog attribute for clean output
-      html = html.replace(/ data-chatlog="true"/, '');
+      html = html.replaceAll(' data-chatlog="true"', '');
       try {
         await copyMobileHtml(html, $('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC');
       } catch (err) {
