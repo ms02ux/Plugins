@@ -878,9 +878,29 @@
     h += '</div>';
     } // end cover section
 
+    // -- 텍스트 헤더 (Form C: text-only — 커버 이미지 없이 제목+태그만) --
+    if (templateMode === 'text-only') {
+    h += '<div style="background-color:' + theme.coverBg + ';border-radius:16px 16px 0 0;padding:clamp(20px,4vw,30px) clamp(30px,5vw,40px) clamp(15px,3vw,20px);margin:0 0 20px 0;">';
+    h += '<div style="font-size:clamp(10px,1.8vw,11px);color:' + theme.coverLabel + ';letter-spacing:clamp(2px,0.4vw,3px);margin:0 0 5px 0;' + font + ';">' + escHtml(coverLabel) + '</div>';
+    h += '<div style="font-size:clamp(28px,5vw,42px);color:' + theme.coverTitle + ';margin:0;' + font + ';font-weight:700;line-height:1.1;">' + escHtml(charName) + '</div>';
+    if (logTitle) h += '<div style="font-size:clamp(12px,2.2vw,14px);letter-spacing:-0.5px;color:' + theme.coverDesc + ';margin:5px 0 10px 0;' + font + ';max-width:90%;">' + escHtml(logTitle) + '</div>';
+    const tcTags = [];
+    if (modelInfo) tcTags.push(modelInfo);
+    if (promptInfo) tcTags.push(promptInfo);
+    for (const t of customTags) { if (t && t.trim()) tcTags.push(t.trim()); }
+    if (tcTags.length > 0) {
+      const tgS = 'display:inline-block;background:' + theme.tagBg + ';color:' + theme.tagColor + ';padding:clamp(4px,0.8vw,5px) clamp(10px,2vw,12px);margin:0 clamp(6px,1.2vw,8px) clamp(6px,1.2vw,8px) 0;border:1px solid ' + theme.tagBorder + ';font-size:clamp(10px,1.8vw,11px);line-height:1.4;vertical-align:middle;' + font;
+      h += '<div style="font-size:0;">';
+      for (const tag of tcTags) h += '<span style="' + tgS + '">' + escHtml(tag) + '</span> ';
+      h += '</div>';
+    }
+    h += '</div>';
+    } // end text header
+
     // -- 프로필 섹션 (Form A, Form B) --
     if (templateMode !== 'text-only') {
-    h += '<div style="padding:0 0 10px 0;">';
+    const profTopRadius = templateMode === 'no-cover' ? 'border-radius:16px 16px 0 0;overflow:hidden;' : '';
+    h += '<div style="padding:0 0 10px 0;' + profTopRadius + '">';
     h += '<div style="padding:0 clamp(30px,5vw,50px) 10px clamp(30px,5vw,50px);text-align:center;">';
     h += '<span style="display:inline-block;font-size:clamp(11px,2vw,13px);font-weight:600;letter-spacing:clamp(1.5px,0.3vw,2px);color:' + theme.sectionColor + ';text-transform:uppercase;border-bottom:1px solid ' + theme.sectionBorder + ';padding-bottom:5px;margin-bottom:10px;">Profile</span>';
     h += '</div>';
@@ -1153,18 +1173,10 @@
             </div>
             <button class="range-apply-btn" id="btn-apply-range">범위 선택</button>
           </div>
-          <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:4px;">
+          <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
             <button class="sel-btn" id="btn-sel-all">전체</button>
             <button class="sel-btn" id="btn-sel-none">해제</button>
             <button class="sel-btn" id="btn-sel-nouser" title="선택 범위에서 유저 메시지만 해제">유저 해제</button>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
-            <span class="range-label">앞</span>
-            <input type="number" class="range-input" id="front-n" min="1" value="10" style="width:48px;">
-            <button class="sel-btn" id="btn-sel-front">선택</button>
-            <span class="range-label" style="margin-left:4px;">뒤</span>
-            <input type="number" class="range-input" id="back-n" min="1" value="10" style="width:48px;">
-            <button class="sel-btn" id="btn-sel-back">선택</button>
           </div>
         </div>
 
@@ -1344,10 +1356,13 @@
         if (!html) html = buildStyledHtml();
         if (!html) return;
         html = html.replace(/<details open>/g, '<details>').replace(/<details open="">/g, '<details>').replace(/ data-chatlog="true"/g, '');
-        copyMobileHtml(html, btn, '\u{1F4CB} HTML \uBCF5\uC0AC');
+        await copyHtmlToClipboard(html, btn, '\u{1F4CB} HTML \uBCF5\uC0AC');
       } catch (e) {
         try {
-          const html = buildStyledHtml().replace(/<details open>/g, '<details>').replace(/ data-chatlog="true"/g, '');
+          let html = await buildMobileHtml();
+          if (!html) html = buildStyledHtml();
+          if (!html) return;
+          html = html.replace(/<details open>/g, '<details>').replace(/<details open="">/g, '<details>').replace(/ data-chatlog="true"/g, '');
           copyMobileHtml(html, btn, '\u{1F4CB} HTML \uBCF5\uC0AC');
         } catch (e2) {
           console.error('ChatLogDiary: HTML copy failed:', e2);
@@ -1466,21 +1481,6 @@
     $('btn-sel-all').addEventListener('click', selectAll);
     $('btn-sel-none').addEventListener('click', selectNone);
     $('btn-sel-nouser').addEventListener('click', deselectUser);
-    $('btn-sel-front').addEventListener('click', () => {
-      const n = parseInt($('front-n').value, 10) || 10;
-      selectedSet.clear();
-      for (let i = 0; i < Math.min(n, allMessages.length); i++) selectedSet.add(i);
-      renderMessages(); updateRangeHint();
-      if (viewMode === 'preview') renderPreview();
-    });
-    $('btn-sel-back').addEventListener('click', () => {
-      const n = parseInt($('back-n').value, 10) || 10;
-      selectedSet.clear();
-      const start = Math.max(0, allMessages.length - n);
-      for (let i = start; i < allMessages.length; i++) selectedSet.add(i);
-      renderMessages(); updateRangeHint();
-      if (viewMode === 'preview') renderPreview();
-    });
 
     const renderRepList = () => {
       const list = $('rep-list');
