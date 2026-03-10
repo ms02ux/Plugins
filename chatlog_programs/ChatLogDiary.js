@@ -933,7 +933,7 @@
     return header + indices.map(i => { const m = allMessages[i]; return applyReplacements(applyPersona(m.name)) + ':\n' + applyReplacements(applyPersona(m.text)); }).join('\n\n');
   };
 
-  // ========== 모바일 HTML 빌드 (삼성 클립보드 호환) ==========
+  // ========== 모바일 HTML 생성 (삼성 클립보드 호환) ==========
   const buildMobileHtml = async () => {
     const origAssetMap = assetMap;
     const origCharImg = charImageUri;
@@ -954,7 +954,7 @@
     personaImageUri = personaImageUrl || origPersonaImg;
     if (!charImageUrl && origCharImg && origCharImg.startsWith('data:')) hasDataUriFallback = true;
     if (!personaImageUrl && origPersonaImg && origPersonaImg.startsWith('data:')) hasDataUriFallback = true;
-    // Cover image: if it's a user-uploaded data URI, compress it
+    // Cover image: mark user-uploaded data URIs for later Canvas compression
     if (coverImageUri && coverImageUri.startsWith('data:')) hasDataUriFallback = true;
     let html;
     try {
@@ -1299,7 +1299,7 @@
             copyMobileHtml(html, $('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC');
           }
         } catch (e2) {
-          try { await navigator.clipboard.writeText(buildStyledHtml()); showCopied($('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC'); } catch (e3) {}
+          try { await navigator.clipboard.writeText(buildStyledHtml()); showCopied($('btn-copy-html'), '\u{1F4CB} HTML \uBCF5\uC0AC'); } catch (e3) { console.error('ChatLogDiary: All clipboard methods failed:', e3); }
         }
       }
     });
